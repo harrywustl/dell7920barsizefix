@@ -1,0 +1,14 @@
+[Unit]
+Description=Apply locally reviewed GPU BAR allocation before PVE guests
+Wants=systemd-udev-settle.service
+After=systemd-modules-load.service systemd-udev-settle.service
+Before=pve-guests.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -B /opt/rebar-kit/rebar_resize.py --profile /etc/rebar-kit/profile.json --execute
+RemainAfterExit=yes
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target

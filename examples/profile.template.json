@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "baseline": "Replace this string with your private rebar_audit.py JSON snapshot",
+  "initial_bar0_bytes": 268435456,
+  "expected_variable_sha256": "REPLACE_WITH_REVIEWED_LIVE_VARIABLE_SHA256",
+  "firmware_review": {
+    "approved": false,
+    "bios_version": "REPLACE_WITH_EXACT_INSTALLED_VERSION",
+    "firmware_sha256": "REPLACE_WITH_OFFICIAL_FIRMWARE_SHA256",
+    "ifr_sha256": "REPLACE_WITH_REVIEWED_IFR_SHA256"
+  }
+}

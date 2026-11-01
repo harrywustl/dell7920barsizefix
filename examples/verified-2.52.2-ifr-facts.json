@@ -1,0 +1,83 @@
+{
+  "stores": [
+    {
+      "guid": "4402ca38-808f-4279-bcec-5baf8d59092f",
+      "store_id": 2,
+      "attributes": 7,
+      "size": 114
+    }
+  ],
+  "fields": [
+    {
+      "name": "MMIO High Base",
+      "question_id": 9,
+      "offset": 0,
+      "width_bytes": 4,
+      "store_id": 2,
+      "options": {
+        "56T": 0,
+        "40T": 1,
+        "24T": 2,
+        "16T": 3,
+        "4T": 4,
+        "1T": 5
+      }
+    },
+    {
+      "name": "MMIO High Granularity Size",
+      "question_id": 10,
+      "offset": 4,
+      "width_bytes": 2,
+      "store_id": 2,
+      "options": {
+        "1G": 0,
+        "4G": 1,
+        "16G": 2,
+        "64G": 3,
+        "256G": 4,
+        "1024G": 5
+      }
+    },
+    {
+      "name": "Isoc Mode",
+      "question_id": 11,
+      "offset": 8,
+      "width_bytes": 1,
+      "store_id": 2,
+      "options": {
+        "Disable": 0,
+        "Enable": 1,
+        "Auto": 2
+      }
+    }
+  ],
+  "text_sha256": "0a706b87893817f51098c6cef9118fc08949ef8a4e618b0481d3b805682120fd",
+  "raw_checks": [
+    {
+      "kind": "VarStoreEfi",
+      "pe32_offset": 44735
+    },
+    {
+      "kind": "MMIO High Base",
+      "pe32_offset": 45222
+    },
+    {
+      "kind": "MMIO High Granularity Size",
+      "pe32_offset": 45310
+    },
+    {
+      "kind": "Isoc Mode",
+      "pe32_offset": 45380
+    }
+  ],
+  "pe32_sha256": "f5d6fd18c1fcbca3df0cb5e2e4a79b2553701110b0900ccebbbe1c8fd1d09e47",
+  "approved": false,
+  "required_manual_checks": [
+    "Exact installed BIOS and official firmware match",
+    "PE32/raw IFR opcode widths agree",
+    "Live variable GUID/attributes/size match",
+    "Base plus worst-case MMIO range fits physical-address limit",
+    "Review every changed field; do not import another machine's blob"
+  ],
+  "mmio_total_multiplier": 32
+}
