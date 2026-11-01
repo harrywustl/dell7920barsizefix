@@ -11,11 +11,14 @@
 
 It does not replace VM/data backups or guarantee recovery from every no-POST failure. Firmware, ESP images, NVRAM dumps and boot entries from one machine must not be restored onto another.
 
+> [!CAUTION]
+> **Formatting and ESP restore are destructive.** Identify the USB by model/size/connection and confirm it has nothing you need; never select a system disk or your only backup. Verify every hash and readback.
+
 ## 1. Format a new USB — destructive, manual step
 
 Use FAT32. An MBR/FAT32 removable drive or a GPT drive with a FAT32 EFI System Partition can expose the UEFI fallback path. Do not use exFAT/NTFS for the Shell/recovery volume. Windows' built-in formatter may limit FAT32 creation on larger volumes; use an appropriate verified FAT32 formatter instead of silently choosing exFAT.
 
-**The following erase the selected whole USB. Identify it by model/size/connection and confirm it contains no needed files. Never select a system disk or the existing backup USB. The placeholders are intentional.** No repository script formats a disk.
+**The following erase the selected whole USB. The placeholders are intentional; no repository script formats a disk.**
 
 macOS example (single FAT32 removable partition):
 
@@ -58,9 +61,9 @@ sudo python3 -B scripts/prepare_usb.py --usb "$USB" \
 sudo umount /mnt/esp-ro
 ```
 
-It copies the current systemd-boot loader, loader entry and referenced kernel/initrd, checks every copy, and requires ZFS support in the initrd. It never changes the system ESP or BootOrder. For GRUB, encryption, other root filesystems or different boot layouts, design and actually test the corresponding rescue path rather than using this helper unchanged. A rescue USB must be refreshed when the required kernel/root/module compatibility changes.
+`--entry` is the filename under `<ESP>/loader/entries/` (for example `--entry proxmox.conf`), not a path. The helper needs `findmnt` and `lsinitramfs` (initramfs-tools). It copies the current systemd-boot loader, loader entry and referenced kernel/initrd, checks every copy, and requires ZFS support in the initrd. It never changes the system ESP or BootOrder. For GRUB, encryption, other root filesystems or different boot layouts, design and actually test the corresponding rescue path rather than using this helper unchanged. A rescue USB must be refreshed when the required kernel/root/module compatibility changes.
 
-Download Dell's exact model/version recovery image, verify its official checksum, then use `--bios-image "$OFFICIAL_EXE" --bios-sha256 "$OFFICIAL_SHA256"` in that same initial invocation if its recovery procedure permits EXE→`BIOS_IMG.rcv` renaming. For the 2.52.2 release: [Dell driver41C9J](https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=41c9j), SHA256 `0328056ac3573456ac3431e00d4e545c06d485bd87e4a17875ca82412001ac50`. This recipe must be checked again for another release/model. Do not use an extracted research BIOS region as this file.
+Download Dell's exact model/version recovery image, verify its official checksum, then append `--bios-image "$OFFICIAL_EXE" --bios-sha256 "$OFFICIAL_SHA256"` to that same initial invocation if its recovery procedure permits EXE→`BIOS_IMG.rcv` renaming. For the 2.52.2 release: [Dell driver41C9J](https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=41c9j), SHA256 `0328056ac3573456ac3431e00d4e545c06d485bd87e4a17875ca82412001ac50`. This recipe must be checked again for another release/model. Do not use an extracted research BIOS region as this file.
 
 ## 3. Make private backups directly on USB
 
@@ -111,11 +114,11 @@ For an existing case, specify its actual original backup directory instead of RE
 
 Use one **recovery-usb.zip** if the payload fits FAT32's 4GiB file limit; otherwise omit `--single-zip` for ≤2GiB parts. Existing gzip ESP images are stored without pointless recompression. The output directory has parts.json for size/SHA256 and VERIFIED.json only after every ZIP CRC and archived-file SHA256 passes. Its ARCHIVE-MANIFEST.json records the exact functional file tree. The ARCHIVES container is never recursively included.
 
-Place usb_archive.py and rebar_audit.py beside the ZIP/checksum files for restoration without another download. Store short English/Chinese format/restore/F12 instructions there. Full tutorials and original screenshots stay in Git. The ZIP contains private backups/configuration and is not encrypted: restrict NAS access.
+Place usb_archive.py and rebar_audit.py beside the ZIP/checksum files for restoration without another download. Store short English/Chinese format/restore/F12 instructions there. Full tutorials and original screenshots stay in your private repository; only reviewed/anonymized screenshots go in the public repo. The ZIP contains private backups/configuration and is not encrypted: restrict NAS access.
 
 ## 6. Rebuild a new USB from the NAS copy
 
-Copy the ZIP, parts.json, VERIFIED.json and the two restore-helper Python files to the NAS as one folder. For multipart mode, copy every part too. Format a new FAT32 USB as in step1; keep the archive on NAS rather than the destination USB.
+Copy the ZIP, parts.json, VERIFIED.json and the two restore-helper Python files to the NAS as one folder. For multipart mode, copy every part too. Format a new FAT32 USB as in step 1; keep the archive on NAS rather than the destination USB.
 
 ```sh
 python3 -B usb_archive.py verify "$NAS_ARCHIVE_DIR"
@@ -123,7 +126,7 @@ python3 -B usb_archive.py extract "$NAS_ARCHIVE_DIR" \
   --usb "$NEW_USB" --confirm-target-uuid "$NEW_VOLUME_UUID"
 ```
 
-Get the new volume UUID from findmnt on Linux or diskutil info on macOS. The helper requires a mounted FAT32 target, exact UUID confirmation and empty contents apart from OS metadata; refuses overwrites; extracts the same boot/recovery layout; and rereads each restored file to verify its hash. It needs no large temporary file on the Mac. MIGRATION.json records the expected new volume identity.
+Get the new volume UUID from findmnt on Linux or diskutil info on macOS. The helper requires a mounted FAT32 target, exact UUID confirmation and empty contents apart from OS metadata; it refuses to overwrite, extracts the same boot/recovery layout, and rereads each restored file to verify its hash. It needs no large temporary file on the Mac. MIGRATION.json records the expected new volume identity.
 
 The new USB UUID/PARTUUID will differ. Do not change original system-ESP identifiers in backup manifests to bypass target matching. Use RECOVERY/scripts/esp_backup.py with the original manifest and new USB path; the current generic helper still matches the original system ESP PARTUUID/type/size/hash. Historical fixed-USB-UUID tools may correctly refuse the new drive. Use system backups only on the machine they were created for.
 

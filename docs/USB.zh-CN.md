@@ -11,11 +11,14 @@
 
 它不能替代VM/数据备份，也不保证所有无法POST的情况可恢复。不能把一台机器的固件、ESP、NVRAM或启动项恢复到另一台机器。
 
+> [!CAUTION]
+> **格式化和 ESP 恢复都是破坏性操作。** 按型号、容量、连接方式确认目标U盘，并确认里面没有需要保留的数据；绝不能选系统盘或唯一的备份盘。每一步哈希和读回都必须核对。
+
 ## 1. 格式化新U盘：手动破坏性步骤
 
 使用FAT32。MBR/FAT32可移动盘，或GPT上的FAT32 EFI System Partition，都可放置UEFI回退路径。不要选exFAT/NTFS。Windows内置格式化工具可能限制大容量FAT32，需选择经过核实的FAT32工具，不要悄悄改用exFAT。
 
-**以下命令会清空选中的整个U盘。必须按型号、容量、连接方式确认目标且无需要保留的数据；不能选系统盘或现有备份U盘。示例故意使用占位符。仓库脚本不会格式化磁盘。**
+**以下命令会清空选中的整个U盘。示例故意使用占位符；仓库脚本不会格式化磁盘。**
 
 macOS示例（单FAT32可移动分区）：
 
@@ -58,9 +61,9 @@ sudo python3 -B scripts/prepare_usb.py --usb "$USB" \
 sudo umount /mnt/esp-ro
 ```
 
-它复制当前systemd-boot、loader entry及引用的内核/initrd，逐文件校验并确认initrd含ZFS支持，不改变系统ESP或BootOrder。GRUB、加密、其他根文件系统或不同引导布局，必须另外设计并实测救援路径；内核/根系统/模块兼容关系变化时要更新救援U盘。
+`--entry` 是 `<ESP>/loader/entries/` 下的文件名（例如 `--entry proxmox.conf`），不是路径。脚本还需要主机上有 `findmnt` 和 `lsinitramfs`（initramfs-tools）。它复制当前 systemd-boot、loader entry 及引用的内核/initrd，逐文件校验并确认 initrd 含 ZFS 支持，不改变系统 ESP 或 BootOrder。GRUB、加密、其他根文件系统或不同引导布局，必须另外设计并实测救援路径；内核/根系统/模块兼容关系变化时要更新救援 U盘。
 
-从Dell下载准确机型/版本的恢复镜像，核对官方哈希；如果该机型恢复流程允许EXE直接改名`BIOS_IMG.rcv`，可在同一次初始调用加入`--bios-image "$OFFICIAL_EXE" --bios-sha256 "$OFFICIAL_SHA256"`。2.52.2参考来源为[Dell driver41C9J](https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=41c9j)，SHA256 `0328056ac3573456ac3431e00d4e545c06d485bd87e4a17875ca82412001ac50`。换机型/版本需重新核对；不能用提取的研究BIOS区域替代恢复文件。
+从Dell下载准确机型/版本的恢复镜像，核对官方哈希；如果该机型恢复流程允许EXE直接改名`BIOS_IMG.rcv`，可在同一次初始调用后追加`--bios-image "$OFFICIAL_EXE" --bios-sha256 "$OFFICIAL_SHA256"`。2.52.2参考来源为[Dell driver41C9J](https://www.dell.com/support/home/en-us/drivers/driversdetails?driverid=41c9j)，SHA256 `0328056ac3573456ac3431e00d4e545c06d485bd87e4a17875ca82412001ac50`。换机型/版本需重新核对；不能用提取的研究BIOS区域替代恢复文件。
 
 ## 3. 直接备份到U盘
 
@@ -111,11 +114,11 @@ python3 -B scripts/usb_archive.py create --usb "$USB" \
 
 内容小于FAT32单文件4GiB上限时，使用普通**recovery-usb.zip**；过大则去掉`--single-zip`，改用不超过2GiB分卷。现有ESP gzip镜像不再无谓压缩。输出parts.json记录大小/SHA256，只有所有ZIP CRC和归档文件SHA256通过才生成VERIFIED.json；包内ARCHIVE-MANIFEST.json记录准确功能文件树。不会递归包含ARCHIVES目录。
 
-把usb_archive.py和rebar_audit.py也放在ZIP/校验文件旁边，使还原不必另下载工具；旁边提供中英简短格式化/还原/F12步骤。完整教程和原图留Git。ZIP含私有备份/配置且不加密，NAS应限制访问。
+把usb_archive.py和rebar_audit.py也放在ZIP/校验文件旁边，使还原不必另下载工具；旁边提供中英简短格式化/还原/F12步骤。完整教程和原图留在私有仓库；公开仓库只放审核过的匿名化截图。ZIP含私有备份/配置且不加密，NAS应限制访问。
 
 ## 6. 用NAS副本重建新U盘
 
-把ZIP、parts.json、VERIFIED.json及两个恢复助手Python文件一起保存到NAS；若使用分卷，全部卷都要保留。按步骤1格式化新FAT32 U盘，归档留NAS，不放到待还原U盘上。
+把ZIP、parts.json、VERIFIED.json及两个恢复助手Python文件一起保存到NAS；若使用分卷，全部卷都要保留。按步骤 1 格式化新FAT32 U盘，归档留NAS，不放到待还原U盘上。
 
 ```sh
 python3 -B usb_archive.py verify "$NAS_ARCHIVE_DIR"

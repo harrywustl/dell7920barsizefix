@@ -13,14 +13,15 @@
 2. For Linux-only rollback, reboot normally with the service disabled and verify the firmware-default BAR. Stopping a oneshot service does not shrink a live BAR. A larger MMIO address window does not reserve the same amount of system RAM.
 3. To undo the hidden setting, boot USB Shell **on the same reviewed BIOS** and run `REBAR-PLAN\ROLLBACK.nsh RUN` from the matching local plan. Require the complete original-variable comparison to pass before rebooting. If the current variable differs unexpectedly, stop and review it.
 
-For BIOS **2.52.2 only**, the reference rollback is:
+> [!CAUTION]
+> **For BIOS 2.52.2 only.** Do not reuse this `0x04`/`0x0000` rollback on another BIOS. Confirm GUID, offset, width and the recorded original value first; prefer the generated `ROLLBACK.nsh`.
 
 ```text
 setup_var.efi SocketCommonRcConfig:0x04(2)=0x0000
 setup_var.efi SocketCommonRcConfig:0x04(2)
 ```
 
-Use this only after confirming GUID, payload length, offset, width and recorded original value `0`. Preserve Base. Compare the entire payload; never bulk-import another machine's variable or an old blob after a BIOS update.
+Use this only after confirming GUID, payload length, offset, width and recorded original value `0`; the generated `ROLLBACK.nsh` performs the full-variable comparison. Preserve Base. Compare the entire payload; never bulk-import another machine's variable or an old blob after a BIOS update.
 
 ## BIOS upgrade or GPU move
 

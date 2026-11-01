@@ -6,6 +6,9 @@
 
 以下数值仅适用于**2.52.2**，不能泛用于所有“2.52”。以安装版本/日期和ESRT匹配官方固件，再提取Socket Configuration PE32/IFR。研究用BIOS区域不能当SPI全片备份或恢复镜像。
 
+> [!CAUTION]
+> **下表只适用于 BIOS 2.52.2 和本文的 GPU。** 不要把 `0x04` 偏移、`3` 枚举或完整变量复制到另一个 BIOS/机器；请先重新提取 IFR 并审计。写错字段可能让机器无法启动。
+
 | 项目 | 已核实值 |
 |---|---|
 | 变量 | `SocketCommonRcConfig` |
@@ -23,12 +26,14 @@
 
 ## 修改前调查
 
+先把 `USB` 设为 U盘挂载点，把 `TARGET_GIB` 设为目标 BAR 大小（本例 32；必须是 2 的幂）。下文所有 `$...` 都是占位符，替换成你自己的路径/数值。
+
 ```sh
 cat /sys/class/dmi/id/bios_version
 cat /sys/class/dmi/id/bios_date
 lscpu
 lspci -Dnn
-sudo python3 -B scripts/rebar_audit.py --private-output "$USB/before.json"
+sudo python3 -B scripts/rebar_audit.py --target-gib "$TARGET_GIB" --private-output "$USB/before.json"
 ```
 
 原始输出只保存在私有位置。检查目标GPU全部功能、上游桥/根总线、`resource0_resize`支持位图、VFIO绑定、IOMMU成员和可对齐的高位根窗口。移动插槽后不能继续按旧BDF找卡。任何解绑前正常关闭VM；调整脚本发现同分支其他设备或QEMU/VFIO占用会拒绝操作。
@@ -36,7 +41,7 @@ sudo python3 -B scripts/rebar_audit.py --private-output "$USB/before.json"
 ## 离线提取准确版本并核对
 
 1. 从Dell或微软取得与安装版本准确匹配的官方固件；记录链接、校验和、版本/日期及ESRT对应关系。调查时不执行更新程序。
-2. 按[BIOSUtilities](https://github.com/platomav/BIOSUtilities)当前支持格式使用Dell PFS提取；例如在其源码目录：
+2. 按[BIOSUtilities](https://github.com/platomav/BIOSUtilities)当前支持格式使用Dell PFS提取；记录所用版本/commit及提取区域的尺寸/偏移，不同版本的行为可能变化。例如在其源码目录：
 
    ```sh
    python3 main.py "$FIRMWARE" -e -u DellPfsExtract -o "$USB/firmware-extracted"
@@ -51,17 +56,18 @@ sudo python3 -B scripts/rebar_audit.py --private-output "$USB/before.json"
    ```
 
 6. 必须只有一个匹配的VarStore，其GUID、属性、长度与实机一致；文本与原始OneOf操作码的QuestionId、偏移、宽度、合法枚举必须一致。枚举标签仍要读完整IFR确认；脚本不会推断未说明语义。默认`approved=false`是刻意的保护。
-7. 核对`Base + 最大MMIO范围 <= 2^物理地址位宽`。例如56TiB + 32×64GiB = 58TiB，符合46位/64TiB上限。读取实际IFR帮助和CPU位宽，不能假定倍率/枚举标签不变。
+7. 核对`Base + 最大MMIO范围 <= 2^物理地址位宽`。审计脚本会在私有 JSON 中报告 `physical_address_bits`，请用该值而不是猜测。例如56TiB + 32×64GiB = 58TiB，符合46位/64TiB上限。读取实际IFR帮助和CPU位宽，不能假定倍率/枚举标签不变。
 
 ## 记录私有配置并生成Shell操作单
 
-完成上述审核后，显式确认准确版本：
+完成上述审核后，显式确认准确版本。把 `FIRMWARE` 设为下载的 Dell EXE，`OFFICIAL_SHA256` 设为其公布哈希，`EXACT_BIOS_VERSION` 设为安装版本（例如 `2.52.2`），`INITIAL_BAR0_MIB` 设为实测的初始 BAR0（本例 R9700 为 256）。`LIVE_EFIVAR_PATH` 是调查发现的唯一实机 `SocketCommonRcConfig-*` 文件。
 
 ```sh
 python3 -B scripts/make_profile.py \
   --baseline "$USB/before.json" --facts "$USB/ifr-facts.json" \
   --firmware "$FIRMWARE" --official-sha256 "$OFFICIAL_SHA256" \
   --confirm-reviewed-version "$EXACT_BIOS_VERSION" \
+  --initial-bar0-mib "$INITIAL_BAR0_MIB" \
   --output "$USB/prechange-profile.json" \
   --approved-facts-output "$USB/approved-facts.json"
 
@@ -70,7 +76,7 @@ sudo python3 -B scripts/uefi_plan.py --usb "$USB" \
   --efivar "$LIVE_EFIVAR_PATH"
 ```
 
-`LIVE_EFIVAR_PATH`是调查发现的唯一实机`SocketCommonRcConfig-*`文件。生成器检查当前BIOS、GUID、属性、长度和基线哈希，仅向新建`REBAR-PLAN`目录写文件，不写NVRAM。已经是目标枚举时不需要固件写入计划。它不会自动为无关隐藏设置生成操作。
+生成器检查当前 BIOS、GUID、属性、长度和基线哈希，仅向新建 `REBAR-PLAN` 目录写文件，不写 NVRAM。已经是目标枚举时不需要固件写入计划。它不会自动为无关隐藏设置生成操作。`TARGET_GIB` 必须与基线一致；调整脚本会拒绝目标变化。
 
 在USB Shell选择正确U盘文件系统并位于根目录：
 
@@ -82,29 +88,30 @@ REBAR-PLAN\APPLY.nsh RUN
 
 CHECK及救援启动必须先在独立恢复检查点完成；下一次改动会话才执行ROUNDTRIP，看到`ROUNDTRIP_PASS`后才能APPLY。写入脚本拒绝覆盖旧证据，保存完整变量并与预期完整文件比较，不自动重启。出错就停，不要重启或删保护文件盲目重试。同名变量歧义必须停止。计划记录BIOS版本，但Shell脚本不能证明生成后BIOS没变，因此升级后不能复用旧计划。
 
-2.52.2的版本特定写入/读回语法，须先完成上述核验：
+> [!CAUTION]
+> **仅限 2.52.2 的手动后备命令。** 不要把这条 `0x04`/`0x0003` 命令用到另一个 BIOS/GPU；它绕过生成器的完整变量比较。优先使用 `CHECK`/`ROUNDTRIP`/`APPLY`，并且必须先完成新的 IFR 审核。
 
 ```text
 setup_var.efi SocketCommonRcConfig:0x04(2)=0x0003
 setup_var.efi SocketCommonRcConfig:0x04(2)
 ```
 
-payload `00 00`→`03 00`，只有byte4变化。Linux efivarfs前置4字节属性，因此是文件offset8。EDK2保存格式：头8+UTF16名称42+GUID16+属性4=payload起点70（`0x46`）；改变字节74（`0x4a`），CRC位置184（`0xb8`），总长188。写入前将生成文件与新保存的EDK2文件比较；不能把Linux118字节文件当EDK2备份导入。
+payload `00 00`→`03 00`，只有 payload 偏移 4（第 5 个字节）变化。Linux efivarfs 前置 4 字节属性，因此是文件 offset 8。EDK2 保存格式：头 8 + UTF16 名称 42 + GUID 16 + 属性 4 = payload 起点 70（`0x46`）；改变字节 74（`0x4a`），CRC 位置 184（`0xb8`），总长 188。写入前将生成文件与新保存的 EDK2 文件比较；不能把 Linux 118 字节文件当 EDK2 备份导入。
 
 ## Linux分配与持久化
 
-启动PVE后生成**新**私有基线，完整比较新旧变量，确认只改了计划中的字节。实际根窗口必须容纳可对齐的32GiB BAR，64GiB窗口可以容纳它；尚未请求调整时，下游桥仍小并不代表失败。
+启动 PVE 后生成**新**私有基线，完整比较新旧变量，确认只改了计划中的字节。实际根窗口必须容纳可对齐的目标 BAR；本例 32GiB 目标由 64GiB 窗口容纳。尚未请求调整时，下游桥仍小并不代表失败。
 
-使用同一套已审核固件/IFR，从改动后快照生成新的运行配置。本R9700固件默认BAR0为256MiB；其他硬件用`--initial-bar0-mib`指定实际默认值。
+使用同一套已审核固件/IFR 和同一个 `TARGET_GIB`，从改动后快照生成新的运行配置。本 R9700 固件默认 BAR0 为 256MiB；其他硬件用 `--initial-bar0-mib` 指定实际默认值。
 
 ```sh
-sudo python3 -B scripts/rebar_audit.py --private-output "$USB/postchange.json"
-# 重跑make_profile，输入postchange.json，输出使用新文件名。
+sudo python3 -B scripts/rebar_audit.py --target-gib "$TARGET_GIB" --private-output "$USB/postchange.json"
+# 重跑 make_profile，输入 postchange.json，使用同一个 INITIAL_BAR0_MIB，输出用新文件名。
 sudo python3 -B scripts/rebar_resize.py --profile "$USB/runtime-profile.json"
 sudo python3 -B scripts/rebar_resize.py --profile "$USB/runtime-profile.json" --execute
 ```
 
-Linux BAR大小为`2^(20+n)`字节，n15=32GiB，n8=256MiB。标准接口由内核重分配桥窗口，不手写PCI寄存器偏移。确认BAR2大小未变，再测试一台GPU VM。
+Linux BAR 大小为 `2^(20+n)` 字节，n15=32GiB，n8=256MiB。标准接口由内核重分配桥窗口，不手写 PCI 寄存器偏移；[`resource0_resize` 接口](https://github.com/torvalds/linux/blob/v6.1/Documentation/ABI/testing/sysfs-bus-pci#L461)至少从 Linux 6.1 起就有文档记录；本例在 Linux 7.0（`7.0.14-26-pve`）上验证。请按你的内核核对 sysfs 接口，再确认 GPU 的其他 BAR 大小未变，并测试一台 GPU VM。
 
 手动成功后才安装服务；以下命令会改变宿主文件：
 

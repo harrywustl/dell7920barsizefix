@@ -13,14 +13,15 @@
 2. 只撤销Linux调整时，保持服务停用并正常重启，核实BAR回到固件默认大小。停止oneshot服务不会缩小当前BAR。扩大MMIO地址窗口不代表预留同等大小的系统RAM。
 3. 撤销隐藏设置时，在**原已审核BIOS版本**下进入USB Shell，执行对应本机计划的`REBAR-PLAN\ROLLBACK.nsh RUN`。完整原变量比较通过后才能重启；当前变量有意外差异就停下复核。
 
-仅针对BIOS **2.52.2**的参考回滚：
+> [!CAUTION]
+> **仅限 BIOS 2.52.2。** 不要把这条 `0x04`/`0x0000` 回滚命令用到另一个 BIOS；使用前必须核实 GUID、偏移、宽度和记录的原值。优先使用生成的 `ROLLBACK.nsh`。
 
 ```text
 setup_var.efi SocketCommonRcConfig:0x04(2)=0x0000
 setup_var.efi SocketCommonRcConfig:0x04(2)
 ```
 
-使用前必须核实GUID、payload长度、偏移、宽度及记录的原值`0`。Base保持不变，比较完整payload。不能导入其他机器变量，也不能升级后整包恢复旧变量。
+使用前必须核实GUID、payload长度、偏移、宽度及记录的原值`0`；生成的`ROLLBACK.nsh`会做完整变量比较。Base保持不变，比较完整payload。不能导入其他机器变量，也不能升级后整包恢复旧变量。
 
 ## 升级BIOS或移动GPU
 

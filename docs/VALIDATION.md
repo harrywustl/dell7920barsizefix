@@ -10,7 +10,7 @@
 | Modified PVE boot | Variable diff, root window, manual resize, one guest, service installation | Host/guest checks pass before enabling automation |
 | Final normal reboot | Service journal, startup order, host and guest recheck | Actual resize from firmware default occurs before PVE guests |
 
-This normally takes three boot cycles from a prepared host. If recovery-menu access is unverified, test it separately before the change session. Record relevant F2 settings in one visit; exiting F2 can cause an additional reboot. Keep a local console available.
+This normally takes **2 USB Shell boots + 3 PVE boots** (PVE rescue, modified PVE, final normal reboot) from a prepared host, plus an optional cold recovery-menu test. If recovery-menu access is unverified, test it separately before the change session. Record relevant F2 settings in one visit; exiting F2 can cause an additional reboot. Keep a local console available.
 
 ## Acceptance checks
 
